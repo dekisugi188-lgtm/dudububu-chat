@@ -9,32 +9,43 @@ const io = new Server(server);
 app.use(express.static("public"));
 
 io.on("connection", (socket) => {
+  let room = null;
 
-  socket.on("join-room", (room) => {
+  socket.on("join-room", (password) => {
+    room = password;
     socket.join(room);
     socket.to(room).emit("user-online");
   });
 
-  socket.on("encrypted-message", ({ room, data }) => {
-    socket.to(room).emit("encrypted-message", data);
+  socket.on("typing", () => {
+    socket.to(room).emit("typing");
+  });
+
+  socket.on("stop-typing", () => {
+    socket.to(room).emit("stop-typing");
+  });
+
+  socket.on("message", (msg) => {
+    socket.to(room).emit("message", msg);
+  });
+
+  socket.on("media", (data) => {
+    socket.to(room).emit("media", data);
   });
 
   // WebRTC signaling
-  socket.on("call-user", ({ room, offer }) => {
-    socket.to(room).emit("incoming-call", offer);
-  });
+  socket.on("offer", (data) => socket.to(room).emit("offer", data));
+  socket.on("answer", (data) => socket.to(room).emit("answer", data));
+  socket.on("ice-candidate", (data) =>
+    socket.to(room).emit("ice-candidate", data)
+  );
 
-  socket.on("answer-call", ({ room, answer }) => {
-    socket.to(room).emit("call-answered", answer);
+  socket.on("disconnect", () => {
+    if (room) socket.to(room).emit("user-offline");
   });
-
-  socket.on("ice-candidate", ({ room, candidate }) => {
-    socket.to(room).emit("ice-candidate", candidate);
-  });
-
 });
 
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log("Server running on port", PORT);
-});
+const PORT = process.env.PORT || 10000;
+server.listen(PORT, () =>
+  console.log("Server running on http://localhost:" + PORT)
+);

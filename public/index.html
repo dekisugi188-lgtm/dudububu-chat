@@ -2,149 +2,128 @@
 <html>
 <head>
   <title>Dudububu Chat 💕</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-    body {
-      background: #0f172a;
-      color: white;
-      font-family: Arial;
-      max-width: 600px;
-      margin: auto;
-      padding: 10px;
-    }
+    body { background:#0f172a; color:white; font-family:sans-serif; margin:0 }
+    .login, .chat { padding:20px }
+    .chat { display:none }
     input, button {
-      width: 100%;
-      padding: 10px;
-      margin: 5px 0;
-      border-radius: 8px;
-      border: none;
+      padding:10px; border:none; border-radius:8px; margin:5px 0;
+      width:100%;
     }
-    button {
-      background: #ec4899;
-      color: white;
-      font-weight: bold;
-    }
-    #chat { display: none; }
-    #messages div { margin: 4px 0; }
-    video {
-      width: 100%;
-      border-radius: 10px;
-      margin-top: 8px;
-      background: black;
-    }
+    button { background:#ec4899; color:white }
+    #messages div { margin:6px 0 }
+    .me { text-align:right }
+    .typing { font-size:12px; opacity:.7 }
+    .status { font-size:12px; color:#22c55e }
   </style>
 </head>
 <body>
 
-<h2>💖 Dudububu Private Chat</h2>
-
-<div id="login">
-  <input id="pass" type="password" placeholder="Enter secret password" />
-  <button onclick="start()">Enter</button>
+<div class="login" id="login">
+  <h2>Private Chat 💖</h2>
+  <input id="pass" type="password" placeholder="Shared secret password">
+  <button onclick="join()">Enter</button>
 </div>
 
-<div id="chat">
-  <button onclick="startCall()">📹 Video Call</button>
-
-  <video id="myVideo" autoplay muted></video>
-  <video id="remoteVideo" autoplay></video>
-
+<div class="chat" id="chat">
+  <div class="status" id="status">Offline</div>
   <div id="messages"></div>
-  <input id="msg" placeholder="Type message..." />
+  <div class="typing" id="typing"></div>
+
+  <input id="msg" placeholder="Message..."
+    oninput="typing(true)" onblur="typing(false)">
+  <input type="file" id="file" accept="image/*,video/*">
   <button onclick="send()">Send</button>
+  <button onclick="startCall()">📹 Video Call</button>
 </div>
+
+<video id="local" autoplay muted></video>
+<video id="remote" autoplay></video>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
 const socket = io();
-let room;
+let room = "";
 let pc;
-let localStream;
 
-async function start() {
-  room = document.getElementById("pass").value;
-  if (!room) return;
-
+function join(){
+  room = pass.value;
   socket.emit("join-room", room);
-  document.getElementById("login").style.display = "none";
-  document.getElementById("chat").style.display = "block";
+  login.style.display="none";
+  chat.style.display="block";
 }
 
-function addMessage(t) {
-  const d = document.createElement("div");
-  d.innerText = t;
-  document.getElementById("messages").appendChild(d);
+socket.on("user-online",()=>status.innerText="Online");
+socket.on("user-offline",()=>status.innerText="Offline");
+
+function typing(state){
+  socket.emit(state?"typing":"stop-typing");
+}
+socket.on("typing",()=>typingDiv.innerText="typing...");
+socket.on("stop-typing",()=>typingDiv.innerText="");
+
+function send(){
+  const file = document.getElementById("file").files[0];
+  if(file){
+    const reader=new FileReader();
+    reader.onload=()=>socket.emit("media",{data:reader.result,type:file.type});
+    reader.readAsDataURL(file);
+    return;
+  }
+  socket.emit("message",msg.value);
+  add("Me: "+msg.value,"me");
+  msg.value="";
 }
 
-function send() {
-  const text = msg.value;
-  if (!text) return;
-  addMessage("Me: " + text);
-  socket.emit("encrypted-message", { room, data: text });
-  msg.value = "";
-}
-
-socket.on("encrypted-message", (text) => {
-  addMessage("Her: " + text);
+socket.on("message",(m)=>add("Her: "+m));
+socket.on("media",(m)=>{
+  if(m.type.startsWith("image")){
+    add(`<img src="${m.data}" width="200">`);
+  }else{
+    add(`<video src="${m.data}" controls width="200"></video>`);
+  }
 });
 
-// ---------- VIDEO CALL ----------
+function add(html,cls=""){
+  const d=document.createElement("div");
+  d.innerHTML=html;
+  d.className=cls;
+  messages.appendChild(d);
+}
 
-async function startCall() {
-  pc = createPeer();
+// VIDEO CALL
+async function startCall(){
+  pc=new RTCPeerConnection();
+  const stream=await navigator.mediaDevices.getUserMedia({video:true,audio:true});
+  stream.getTracks().forEach(t=>pc.addTrack(t,stream));
+  local.srcObject=stream;
 
-  localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-  myVideo.srcObject = localStream;
+  pc.ontrack=e=>remote.srcObject=e.streams[0];
+  pc.onicecandidate=e=>e.candidate&&socket.emit("ice-candidate",e.candidate);
 
-  localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
-
-  const offer = await pc.createOffer();
+  const offer=await pc.createOffer();
   await pc.setLocalDescription(offer);
-
-  socket.emit("call-user", { room, offer });
+  socket.emit("offer",offer);
 }
 
-socket.on("incoming-call", async (offer) => {
-  pc = createPeer();
+socket.on("offer",async o=>{
+  pc=new RTCPeerConnection();
+  const stream=await navigator.mediaDevices.getUserMedia({video:true,audio:true});
+  stream.getTracks().forEach(t=>pc.addTrack(t,stream));
+  local.srcObject=stream;
 
-  localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-  myVideo.srcObject = localStream;
+  pc.ontrack=e=>remote.srcObject=e.streams[0];
+  pc.onicecandidate=e=>e.candidate&&socket.emit("ice-candidate",e.candidate);
 
-  localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
-
-  await pc.setRemoteDescription(offer);
-  const answer = await pc.createAnswer();
-  await pc.setLocalDescription(answer);
-
-  socket.emit("answer-call", { room, answer });
+  await pc.setRemoteDescription(o);
+  const ans=await pc.createAnswer();
+  await pc.setLocalDescription(ans);
+  socket.emit("answer",ans);
 });
 
-socket.on("call-answered", async (answer) => {
-  await pc.setRemoteDescription(answer);
-});
-
-socket.on("ice-candidate", (candidate) => {
-  pc.addIceCandidate(candidate);
-});
-
-function createPeer() {
-  const peer = new RTCPeerConnection({
-    iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
-  });
-
-  peer.ontrack = (e) => {
-    remoteVideo.srcObject = e.streams[0];
-  };
-
-  peer.onicecandidate = (e) => {
-    if (e.candidate) {
-      socket.emit("ice-candidate", { room, candidate: e.candidate });
-    }
-  };
-
-  return peer;
-}
+socket.on("answer",a=>pc.setRemoteDescription(a));
+socket.on("ice-candidate",c=>pc.addIceCandidate(c));
 </script>
-
 </body>
 </html>
