@@ -1,111 +1,148 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>DuduBubu Chat 💕</title>
-<style>
-body{
-  margin:0;
-  font-family: Arial;
-  background:#fce4ec;
-}
-#login, #chat{
-  height:100vh;
-  display:flex;
-  flex-direction:column;
-  justify-content:center;
-  align-items:center;
-}
-#chat{ display:none; }
-
-input{
-  padding:12px;
-  width:80%;
-  max-width:300px;
-  margin:8px;
-  border-radius:20px;
-  border:1px solid #ccc;
-}
-button{
-  padding:10px 20px;
-  border:none;
-  border-radius:20px;
-  background:#e91e63;
-  color:white;
-  font-size:16px;
-}
-
-#messages{
-  flex:1;
-  width:100%;
-  padding:10px;
-  overflow-y:auto;
-}
-.msg{
-  max-width:70%;
-  padding:8px 12px;
-  margin:5px;
-  border-radius:15px;
-  background:#fff;
-}
-.me{ background:#f8bbd0; margin-left:auto; }
-
-#sendBox{
-  display:flex;
-  width:100%;
-  padding:10px;
-}
-#sendBox input{ flex:1; }
-</style>
+  <title>Dudububu Chat 💕</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      background: #0f172a;
+      color: white;
+      font-family: Arial;
+      max-width: 600px;
+      margin: auto;
+      padding: 10px;
+    }
+    input, button {
+      width: 100%;
+      padding: 10px;
+      margin: 5px 0;
+      border-radius: 8px;
+      border: none;
+    }
+    button {
+      background: #ec4899;
+      color: white;
+      font-weight: bold;
+    }
+    #chat { display: none; }
+    #messages div { margin: 4px 0; }
+    video {
+      width: 100%;
+      border-radius: 10px;
+      margin-top: 8px;
+      background: black;
+    }
+  </style>
 </head>
-
 <body>
 
-<!-- PASSWORD SCREEN -->
+<h2>💖 Dudububu Private Chat</h2>
+
 <div id="login">
-  <h2>🔐 Enter Secret Password</h2>
-  <input type="password" id="password" placeholder="Same password for both">
-  <button onclick="enter()">Enter Chat</button>
+  <input id="pass" type="password" placeholder="Enter secret password" />
+  <button onclick="start()">Enter</button>
 </div>
 
-<!-- CHAT SCREEN -->
 <div id="chat">
+  <button onclick="startCall()">📹 Video Call</button>
+
+  <video id="myVideo" autoplay muted></video>
+  <video id="remoteVideo" autoplay></video>
+
   <div id="messages"></div>
-  <div id="sendBox">
-    <input id="msg" placeholder="Type message">
-    <button onclick="send()">Send</button>
-  </div>
+  <input id="msg" placeholder="Type message..." />
+  <button onclick="send()">Send</button>
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
 const socket = io();
-let room = "";
+let room;
+let pc;
+let localStream;
 
-function enter(){
-  const pass = document.getElementById("password").value;
-  if(!pass) return alert("Password required");
-  room = pass;              // password = room
+async function start() {
+  room = document.getElementById("pass").value;
+  if (!room) return;
+
   socket.emit("join-room", room);
-  document.getElementById("login").style.display="none";
-  document.getElementById("chat").style.display="flex";
+  document.getElementById("login").style.display = "none";
+  document.getElementById("chat").style.display = "block";
 }
 
-function send(){
-  const input = document.getElementById("msg");
-  if(!input.value) return;
-  add(input.value, true);
-  socket.emit("message", input.value);
-  input.value="";
+function addMessage(t) {
+  const d = document.createElement("div");
+  d.innerText = t;
+  document.getElementById("messages").appendChild(d);
 }
 
-socket.on("message", msg => add(msg,false));
+function send() {
+  const text = msg.value;
+  if (!text) return;
+  addMessage("Me: " + text);
+  socket.emit("encrypted-message", { room, data: text });
+  msg.value = "";
+}
 
-function add(text, me){
-  const div=document.createElement("div");
-  div.className="msg"+(me?" me":"");
-  div.innerText=text;
-  document.getElementById("messages").appendChild(div);
+socket.on("encrypted-message", (text) => {
+  addMessage("Her: " + text);
+});
+
+// ---------- VIDEO CALL ----------
+
+async function startCall() {
+  pc = createPeer();
+
+  localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+  myVideo.srcObject = localStream;
+
+  localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+
+  socket.emit("call-user", { room, offer });
+}
+
+socket.on("incoming-call", async (offer) => {
+  pc = createPeer();
+
+  localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+  myVideo.srcObject = localStream;
+
+  localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+
+  await pc.setRemoteDescription(offer);
+  const answer = await pc.createAnswer();
+  await pc.setLocalDescription(answer);
+
+  socket.emit("answer-call", { room, answer });
+});
+
+socket.on("call-answered", async (answer) => {
+  await pc.setRemoteDescription(answer);
+});
+
+socket.on("ice-candidate", (candidate) => {
+  pc.addIceCandidate(candidate);
+});
+
+function createPeer() {
+  const peer = new RTCPeerConnection({
+    iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
+  });
+
+  peer.ontrack = (e) => {
+    remoteVideo.srcObject = e.streams[0];
+  };
+
+  peer.onicecandidate = (e) => {
+    if (e.candidate) {
+      socket.emit("ice-candidate", { room, candidate: e.candidate });
+    }
+  };
+
+  return peer;
 }
 </script>
 
