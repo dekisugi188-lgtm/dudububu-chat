@@ -1,38 +1,31 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<meta charset="UTF-8" />
-<title>Dudububu Chat 💕</title>
-<link rel="stylesheet" href="style.css" />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DuduBubu Chat</title>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
-
-
-<div id="login">
-<h2>Enter Secret Password 🔐</h2>
-<input id="roomInput" type="password" placeholder="Same password" />
-<button onclick="joinChat()">Enter</button>
+<div id="login-screen">
+  <input type="password" id="password-input" placeholder="Enter temporary password">
+  <button id="login-btn">Join Chat</button>
 </div>
 
-
-<div id="chat" hidden>
-<div id="status">Offline</div>
-<div id="messages"></div>
-<div id="typing"></div>
-
-
-<input id="msg" placeholder="Type message..." />
-<input type="file" id="file" />
-<button onclick="sendMessage()">Send</button>
-<button onclick="startCall()">📹 Call</button>
+<div id="chat-container" class="hidden">
+  <div id="online-users"></div>
+  <div id="chat-box"></div>
+  <div id="typing-indicator"></div>
+  <input type="text" id="chat-input" placeholder="Type a message">
+  <button id="send-btn">Send</button>
+  <button id="emoji-btn">😊</button>
+  <input type="file" id="media-input" accept="image/*,video/*">
+  <button id="call-btn">Video/Audio Call</button>
+  <video id="local-video" autoplay muted></video>
+  <video id="remote-video" autoplay></video>
 </div>
-
-
-<video id="myVideo" autoplay muted></video>
-<video id="peerVideo" autoplay></video>
-
 
 <script src="/socket.io/socket.io.js"></script>
-<script src="client.js"></script>
+<script src="script.js"></script>
 </body>
 </html>

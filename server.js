@@ -1,60 +1,62 @@
-const express = require('express');
-const http = require('http');
-const { Server } = require('socket.io');
-
+const express = require("express");
+const http = require("http");
+const { Server } = require("socket.io");
+const path = require("path");
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
+app.use(express.static(path.join(__dirname, "public")));
 
-app.use(express.static('public'));
+let onlineUsers = {}; // socket.id -> username
 
+io.on("connection", (socket) => {
+  console.log("New connection:", socket.id);
 
-const users = {};
+  socket.on("join", (username) => {
+    socket.username = username;
+    onlineUsers[socket.id] = username;
+    io.emit("online-users", onlineUsers);
+  });
 
+  socket.on("typing", (isTyping) => {
+    socket.broadcast.emit("typing", { user: socket.username, isTyping });
+  });
 
-io.on('connection', (socket) => {
-socket.on('join-room', (room) => {
-socket.join(room);
-users[socket.id] = room;
-socket.to(room).emit('user-online', socket.id);
+  socket.on("chat-message", (msg) => {
+    socket.broadcast.emit("chat-message", {
+      user: socket.username,
+      msg,
+      timestamp: new Date().getTime(),
+    });
+  });
+
+  socket.on("delete-message", (msgId) => {
+    socket.broadcast.emit("delete-message", msgId);
+  });
+
+  socket.on("media-message", (data) => {
+    socket.broadcast.emit("media-message", { user: socket.username, ...data });
+  });
+
+  socket.on("webrtc-offer", (data) => {
+    socket.to(data.to).emit("webrtc-offer", { from: socket.id, offer: data.offer });
+  });
+
+  socket.on("webrtc-answer", (data) => {
+    socket.to(data.to).emit("webrtc-answer", { from: socket.id, answer: data.answer });
+  });
+
+  socket.on("webrtc-ice-candidate", (data) => {
+    socket.to(data.to).emit("webrtc-ice-candidate", { from: socket.id, candidate: data.candidate });
+  });
+
+  socket.on("disconnect", () => {
+    delete onlineUsers[socket.id];
+    io.emit("online-users", onlineUsers);
+  });
 });
 
-
-socket.on('message', (data) => {
-socket.to(data.room).emit('message', data);
-});
-
-
-socket.on('typing', (room) => {
-socket.to(room).emit('typing');
-});
-
-
-socket.on('stop-typing', (room) => {
-socket.to(room).emit('stop-typing');
-});
-
-
-socket.on('seen', (room) => {
-socket.to(room).emit('seen');
-});
-
-
-socket.on('signal', (data) => {
-socket.to(data.room).emit('signal', data);
-});
-
-
-socket.on('disconnect', () => {
-const room = users[socket.id];
-socket.to(room).emit('user-offline');
-delete users[socket.id];
-});
-});
-
-
-server.listen(10000, () => {
-console.log('Server running on port 10000');
-});
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => console.log("Server running on http://localhost:" + PORT));

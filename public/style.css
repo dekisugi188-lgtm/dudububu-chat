@@ -1,20 +1,12 @@
-body {
-font-family: Arial;
-background: #111;
-color: white;
-}
-#messages div {
-max-width: 90%;
-padding: 8px;
-margin: 4px;
-border-radius: 10px;
-background: #222;
-word-break: break-word;
-}
-input, button {
-width: 100%;
-margin: 4px 0;
-}
-video {
-width: 45%;
-}
+body { font-family: sans-serif; margin:0; padding:0; background:#ffe6f0; }
+.hidden { display:none; }
+#chat-container { display:flex; flex-direction:column; height:100vh; padding:10px; }
+#chat-box { flex:1; overflow-y:auto; margin-bottom:5px; }
+.message { padding:5px 10px; margin:2px 0; border-radius:10px; max-width:80%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.message.self { background:#ff99cc; align-self:flex-end; }
+.message.other { background:#ffb3d9; align-self:flex-start; }
+#chat-input { width:70%; }
+#send-btn, #emoji-btn, #call-btn { margin-left:5px; }
+#online-users { font-size:0.9em; color:#555; margin-bottom:5px; }
+#typing-indicator { font-size:0.8em; color:#555; height:20px; }
+video { width:120px; height:90px; margin:5px; border:1px solid #ccc; }
