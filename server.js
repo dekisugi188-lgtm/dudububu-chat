@@ -9,34 +9,32 @@ const io = new Server(server);
 app.use(express.static("public"));
 
 io.on("connection", (socket) => {
-  console.log("User connected");
 
   socket.on("join-room", (room) => {
     socket.join(room);
-    socket.room = room;
-    socket.to(room).emit("status", "online");
+    socket.to(room).emit("user-online");
   });
 
-  socket.on("message", (msg) => {
-    if (socket.room) {
-      socket.to(socket.room).emit("message", msg);
-    }
+  socket.on("encrypted-message", ({ room, data }) => {
+    socket.to(room).emit("encrypted-message", data);
   });
 
-  socket.on("typing", () => {
-    if (socket.room) {
-      socket.to(socket.room).emit("typing");
-    }
+  // WebRTC signaling
+  socket.on("call-user", ({ room, offer }) => {
+    socket.to(room).emit("incoming-call", offer);
   });
 
-  socket.on("disconnect", () => {
-    if (socket.room) {
-      socket.to(socket.room).emit("status", "offline");
-    }
+  socket.on("answer-call", ({ room, answer }) => {
+    socket.to(room).emit("call-answered", answer);
   });
+
+  socket.on("ice-candidate", ({ room, candidate }) => {
+    socket.to(room).emit("ice-candidate", candidate);
+  });
+
 });
 
-const PORT = process.env.PORT || 10000;
+const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log("Server running on port", PORT);
 });
