@@ -1,102 +1,66 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Private Chat</title>
+  <meta charset="UTF-8" />
+  <title>DUDU Private Chat 💕</title>
+  <script src="/socket.io/socket.io.js"></script>
   <style>
-    body { font-family: Arial; max-width: 600px; margin: auto; }
-    #messages div { margin: 5px 0; }
+    body {
+      font-family: Arial, sans-serif;
+      background: #111;
+      color: #fff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+    #chat {
+      width: 300px;
+    }
+    input, button {
+      width: 100%;
+      padding: 10px;
+      margin-top: 5px;
+    }
+    #messages {
+      height: 200px;
+      overflow-y: auto;
+      border: 1px solid #444;
+      margin-top: 10px;
+      padding: 5px;
+    }
   </style>
 </head>
 <body>
-  <h2>Private Chat ❤️</h2>
 
-  <div id="login">
-    <input id="username" placeholder="Your name" />
-    <input id="passphrase" placeholder="Enter secret passphrase" />
-    <button onclick="start()">Enter Chat</button>
-  </div>
+<div id="chat">
+  <h3>DUDU Chat 💖</h3>
+  <input id="msg" placeholder="Type message..." />
+  <button onclick="send()">Send</button>
+  <div id="messages"></div>
+</div>
 
-  <div id="chat" style="display:none">
-    <div id="messages"></div>
-    <input id="msg" placeholder="Type message" />
-    <button onclick="send()">Send</button>
-  </div>
-
-<script src="/socket.io/socket.io.js"></script>
 <script>
-const socket = io();
-let key;
+  const socket = io();
+  const messages = document.getElementById("messages");
 
-// generate encryption key
-async function getKey(passphrase) {
-  const enc = new TextEncoder();
-  const keyMaterial = await crypto.subtle.importKey(
-    "raw", enc.encode(passphrase), "PBKDF2", false, ["deriveKey"]
-  );
+  function send() {
+    const input = document.getElementById("msg");
+    socket.emit("encrypted-message", input.value);
+    addMessage("You: " + input.value);
+    input.value = "";
+  }
 
-  return crypto.subtle.deriveKey(
-    {
-      name: "PBKDF2",
-      salt: enc.encode("fixed-salt"),
-      iterations: 100000,
-      hash: "SHA-256"
-    },
-    keyMaterial,
-    { name: "AES-GCM", length: 256 },
-    false,
-    ["encrypt", "decrypt"]
-  );
-}
+  socket.on("encrypted-message", (msg) => {
+    addMessage("GF: " + msg);
+  });
 
-async function encrypt(text) {
-  const enc = new TextEncoder();
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-  const data = await crypto.subtle.encrypt(
-    { name: "AES-GCM", iv }, key, enc.encode(text)
-  );
-  return { iv: Array.from(iv), data: Array.from(new Uint8Array(data)) };
-}
-
-async function decrypt(payload) {
-  const iv = new Uint8Array(payload.iv);
-  const data = new Uint8Array(payload.data);
-  const dec = await crypto.subtle.decrypt(
-    { name: "AES-GCM", iv }, key, data
-  );
-  return new TextDecoder().decode(dec);
-}
-
-async function start() {
-  const pass = document.getElementById("passphrase").value;
-  if (!pass) return;
-  key = await getKey(pass);
-  document.getElementById("login").style.display = "none";
-  document.getElementById("chat").style.display = "block";
-}
-
-async function send() {
-  const input = document.getElementById("msg");
-  const text = input.value;
-  if (!text) return;
-
-  const encrypted = await encrypt(text);
-  addMessage("Me: " + text);
-  socket.emit("encrypted-message", encrypted);
-  input.value = "";
-}
-
-socket.on("encrypted-message", async (payload) => {
-  try {
-    const text = await decrypt(payload);
-    addMessage("Her: " + text);
-  } catch {}
-});
-
-function addMessage(t) {
-  const div = document.createElement("div");
-  div.innerText = t;
-  document.getElementById("messages").appendChild(div);
-}
+  function addMessage(text) {
+    const div = document.createElement("div");
+    div.textContent = text;
+    messages.appendChild(div);
+  }
 </script>
+
 </body>
 </html>
