@@ -1,64 +1,108 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <title>DUDU Private Chat 💕</title>
-  <script src="/socket.io/socket.io.js"></script>
+  <title>Private Chat 💕</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
   <style>
     body {
-      font-family: Arial, sans-serif;
-      background: #111;
-      color: #fff;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
+      font-family: Arial;
+      background: #0f172a;
+      color: white;
+      margin: 0;
+      padding: 10px;
     }
-    #chat {
-      width: 300px;
+    #login, #chat {
+      max-width: 500px;
+      margin: auto;
     }
     input, button {
       width: 100%;
       padding: 10px;
-      margin-top: 5px;
-    }
-    #messages {
-      height: 200px;
-      overflow-y: auto;
-      border: 1px solid #444;
       margin-top: 10px;
-      padding: 5px;
+      border-radius: 8px;
+      border: none;
+    }
+    button {
+      background: #ec4899;
+      color: white;
+      font-size: 16px;
+    }
+    #messages div {
+      margin: 8px 0;
+      padding: 8px;
+      background: #1e293b;
+      border-radius: 6px;
+    }
+    #typing {
+      font-size: 12px;
+      color: #c084fc;
     }
   </style>
 </head>
+
 <body>
 
-<div id="chat">
-  <h3>DUDU Chat 💖</h3>
-  <input id="msg" placeholder="Type message..." />
-  <button onclick="send()">Send</button>
-  <div id="messages"></div>
+<div id="login">
+  <h2>🔐 Enter Secret Password</h2>
+  <input id="room" type="password" placeholder="Same password for both 💖">
+  <button onclick="join()">Enter Chat</button>
 </div>
 
+<div id="chat" style="display:none">
+  <h3>Private Chat 💕</h3>
+  <div id="messages"></div>
+  <div id="typing"></div>
+  <input id="msg" placeholder="Type message..." oninput="typing()">
+  <button onclick="send()">Send</button>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
 <script>
   const socket = io();
-  const messages = document.getElementById("messages");
+  let room = "";
+
+  function join() {
+    room = document.getElementById("room").value;
+    if (!room) return;
+
+    socket.emit("join-room", room);
+    document.getElementById("login").style.display = "none";
+    document.getElementById("chat").style.display = "block";
+  }
 
   function send() {
     const input = document.getElementById("msg");
-    socket.emit("encrypted-message", input.value);
-    addMessage("You: " + input.value);
+    if (!input.value) return;
+
+    socket.emit("message", input.value);
+    add("Me", input.value);
     input.value = "";
   }
 
-  socket.on("encrypted-message", (msg) => {
-    addMessage("GF: " + msg);
+  function typing() {
+    socket.emit("typing");
+  }
+
+  socket.on("message", (msg) => {
+    add("Her", msg);
   });
 
-  function addMessage(text) {
+  socket.on("typing", () => {
+    document.getElementById("typing").innerText = "Typing...";
+    setTimeout(() => {
+      document.getElementById("typing").innerText = "";
+    }, 1000);
+  });
+
+  socket.on("status", (s) => {
+    add("System", "User is " + s);
+  });
+
+  function add(user, text) {
     const div = document.createElement("div");
-    div.textContent = text;
-    messages.appendChild(div);
+    div.innerText = user + ": " + text;
+    document.getElementById("messages").appendChild(div);
   }
 </script>
 
