@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html>
 <head>
- 
   <title>Private Chat</title>
   <style>
     body { font-family: Arial; max-width: 600px; margin: auto; }
@@ -9,7 +8,7 @@
   </style>
 </head>
 <body>
-  <h2>Private Chat</h2>
+  <h2>Private Chat ❤️</h2>
 
   <div id="login">
     <input id="username" placeholder="Your name" />
@@ -28,7 +27,7 @@
 const socket = io();
 let key;
 
-// create encryption key from passphrase
+// generate encryption key
 async function getKey(passphrase) {
   const enc = new TextEncoder();
   const keyMaterial = await crypto.subtle.importKey(
@@ -67,7 +66,6 @@ async function decrypt(payload) {
   return new TextDecoder().decode(dec);
 }
 
-// enter chat
 async function start() {
   const pass = document.getElementById("passphrase").value;
   if (!pass) return;
@@ -76,7 +74,6 @@ async function start() {
   document.getElementById("chat").style.display = "block";
 }
 
-// send message
 async function send() {
   const input = document.getElementById("msg");
   const text = input.value;
@@ -88,14 +85,11 @@ async function send() {
   input.value = "";
 }
 
-// receive message
 socket.on("encrypted-message", async (payload) => {
   try {
     const text = await decrypt(payload);
     addMessage("Her: " + text);
-  } catch {
-    // wrong passphrase, ignore
-  }
+  } catch {}
 });
 
 function addMessage(t) {
