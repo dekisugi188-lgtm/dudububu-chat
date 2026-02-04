@@ -1,206 +1,38 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Dudububu 💕</title>
-
-<style>
-* { box-sizing: border-box; }
-body {
-  margin:0;
-  font-family: system-ui, sans-serif;
-  background:#0f172a;
-  color:white;
-}
-
-/* LOGIN */
-#login {
-  padding:20px;
-}
-input, button {
-  width:100%;
-  padding:12px;
-  border:none;
-  border-radius:10px;
-  margin-top:10px;
-}
-button { background:#ec4899; color:white; }
-
-/* CHAT */
-#chat { display:none; height:100vh; }
-#header {
-  padding:12px;
-  background:#020617;
-  font-size:14px;
-}
-#status { color:#22c55e; font-size:12px; }
-
-#messages {
-  padding:10px;
-  overflow-y:auto;
-  height:calc(100vh - 190px);
-}
-.msg {
-  max-width:80%;
-  padding:8px 12px;
-  margin:6px 0;
-  border-radius:12px;
-  word-wrap:break-word;
-}
-.me { background:#ec4899; margin-left:auto; }
-.her { background:#1e293b; }
-
-#typing { font-size:12px; opacity:0.7; }
-
-/* INPUT BAR */
-#inputBar {
-  position:fixed;
-  bottom:0;
-  width:100%;
-  padding:10px;
-  background:#020617;
-  display:flex;
-  gap:6px;
-}
-#inputBar input[type="text"] {
-  flex:1;
-}
-
-/* VIDEO CALL */
-#call {
-  display:none;
-  position:fixed;
-  inset:0;
-  background:black;
-}
-video {
-  width:100%;
-  height:100%;
-  object-fit:cover;
-}
-#endCall {
-  position:absolute;
-  bottom:30px;
-  left:50%;
-  transform:translateX(-50%);
-  background:red;
-}
-</style>
+<meta charset="UTF-8" />
+<title>Dudububu Chat 💕</title>
+<link rel="stylesheet" href="style.css" />
 </head>
-
 <body>
 
+
 <div id="login">
-  <h2>Private Chat 💖</h2>
-  <input id="pass" type="password" placeholder="Shared password">
-  <button onclick="join()">Enter</button>
+<h2>Enter Secret Password 🔐</h2>
+<input id="roomInput" type="password" placeholder="Same password" />
+<button onclick="joinChat()">Enter</button>
 </div>
 
-<div id="chat">
-  <div id="header">
-    Status: <span id="status">Offline</span>
-  </div>
 
-  <div id="messages"></div>
-  <div id="typing"></div>
+<div id="chat" hidden>
+<div id="status">Offline</div>
+<div id="messages"></div>
+<div id="typing"></div>
 
-  <div id="inputBar">
-    <input id="msg" type="text" placeholder="Message..."
-      oninput="socket.emit('typing')"
-      onblur="socket.emit('stop-typing')">
-    <input type="file" id="file" accept="image/*,video/*">
-    <button onclick="send()">➤</button>
-    <button onclick="startCall()">📹</button>
-  </div>
+
+<input id="msg" placeholder="Type message..." />
+<input type="file" id="file" />
+<button onclick="sendMessage()">Send</button>
+<button onclick="startCall()">📹 Call</button>
 </div>
 
-<div id="call">
-  <video id="remote" autoplay></video>
-  <video id="local" autoplay muted style="width:120px;height:160px;position:absolute;top:10px;right:10px;"></video>
-  <button id="endCall" onclick="endCall()">End</button>
-</div>
+
+<video id="myVideo" autoplay muted></video>
+<video id="peerVideo" autoplay></video>
+
 
 <script src="/socket.io/socket.io.js"></script>
-<script>
-const socket = io();
-let pc;
-
-function join(){
-  socket.emit("join-room", pass.value);
-  login.style.display="none";
-  chat.style.display="block";
-}
-
-socket.on("status", s => status.innerText = s);
-socket.on("typing", () => typing.innerText = "typing...");
-socket.on("stop-typing", () => typing.innerText = "");
-
-function add(text, me=false){
-  const d=document.createElement("div");
-  d.className="msg "+(me?"me":"her");
-  d.innerText=text;
-  messages.appendChild(d);
-  messages.scrollTop=messages.scrollHeight;
-}
-
-function send(){
-  const f=file.files[0];
-  if(f){
-    const r=new FileReader();
-    r.onload=()=>socket.emit("media",{data:r.result,type:f.type});
-    r.readAsDataURL(f);
-    return;
-  }
-  socket.emit("message",msg.value);
-  add(msg.value,true);
-  msg.value="";
-}
-
-socket.on("message", m => add(m));
-socket.on("media", m => {
-  if(m.type.startsWith("image"))
-    add("📷 Image",false);
-  else
-    add("🎥 Video",false);
-});
-
-/* SIMPLE VIDEO CALL */
-async function startCall(){
-  call.style.display="block";
-  pc=new RTCPeerConnection();
-  const s=await navigator.mediaDevices.getUserMedia({video:true,audio:true});
-  local.srcObject=s;
-  s.getTracks().forEach(t=>pc.addTrack(t,s));
-  pc.ontrack=e=>remote.srcObject=e.streams[0];
-  pc.onicecandidate=e=>e.candidate&&socket.emit("ice",e.candidate);
-  const o=await pc.createOffer();
-  await pc.setLocalDescription(o);
-  socket.emit("call-offer",o);
-}
-
-socket.on("call-offer", async o=>{
-  call.style.display="block";
-  pc=new RTCPeerConnection();
-  const s=await navigator.mediaDevices.getUserMedia({video:true,audio:true});
-  local.srcObject=s;
-  s.getTracks().forEach(t=>pc.addTrack(t,s));
-  pc.ontrack=e=>remote.srcObject=e.streams[0];
-  pc.onicecandidate=e=>e.candidate&&socket.emit("ice",e.candidate);
-  await pc.setRemoteDescription(o);
-  const a=await pc.createAnswer();
-  await pc.setLocalDescription(a);
-  socket.emit("call-answer",a);
-});
-
-socket.on("call-answer", a => pc.setRemoteDescription(a));
-socket.on("ice", c => pc.addIceCandidate(c));
-socket.on("end-call", () => endCall());
-
-function endCall(){
-  call.style.display="none";
-  pc.close();
-  socket.emit("end-call");
-}
-</script>
+<script src="client.js"></script>
 </body>
 </html>
